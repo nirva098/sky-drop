@@ -61,6 +61,25 @@ export const Terrain = () => {
                 <planeGeometry args={[10000, 10000]} />
                 <meshStandardMaterial color="#006994" roughness={0.1} metalness={0.5} />
             </mesh>
+
+            {/* Landing Zone Target */}
+            <group position={[0, 0.1, 0]}>
+                {/* Outer Ring */}
+                <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+                    <ringGeometry args={[10, 12, 32]} />
+                    <meshStandardMaterial color="red" />
+                </mesh>
+                {/* Middle Ring */}
+                <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+                    <ringGeometry args={[5, 7, 32]} />
+                    <meshStandardMaterial color="white" />
+                </mesh>
+                {/* Bullseye */}
+                <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+                    <circleGeometry args={[2, 32]} />
+                    <meshStandardMaterial color="red" />
+                </mesh>
+            </group>
         </group>
     );
 };

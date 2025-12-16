@@ -101,6 +101,11 @@ export const Player = () => {
         // 4. Landing Check
         if ((phase === GamePhase.FREEFALL || phase === GamePhase.CANOPY) && position.y < 2) {
             land();
+            // Calculate 2D distance to center (0,0)
+            const dist = Math.sqrt(position.x ** 2 + position.z ** 2);
+            // We need to access setScore from store, but we only destructured a few. 
+            // Let's rely on useGameStore.getState().setScore(dist) or refetch.
+            useGameStore.getState().setScore(dist);
         }
 
         // Reset Logic (Temporary)

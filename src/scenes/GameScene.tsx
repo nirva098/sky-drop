@@ -3,6 +3,7 @@ import { Physics } from '@react-three/rapier';
 import { Player } from '../components/Player';
 import { Terrain } from '../components/Terrain';
 import { Atmosphere } from '../components/Atmosphere';
+import { GameOverScreen } from '../components/GameOverScreen';
 import { useGameStore } from '../stores/useGameStore';
 
 export const GameScene = () => {
@@ -19,6 +20,7 @@ export const GameScene = () => {
       </Physics>
 
       <Atmosphere />
+      <GameOverScreen />
       {/* HUD Overlay placed via Portal or just outside canvas in main App? 
           For now, we can't render HTML inside Canvas easily without <Html>. 
           Ideally HUD should be in App.tsx, but let's put camera controller here. 

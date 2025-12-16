@@ -19,6 +19,7 @@ interface GameState {
     setPhase: (phase: GamePhase) => void;
     setAltitude: (alt: number) => void;
     setSpeed: (speed: number) => void;
+    setScore: (dist: number) => void;
     reset: () => void;
 
     // Transitions
@@ -36,6 +37,7 @@ export const useGameStore = create<GameState>((set) => ({
     setPhase: (phase) => set({ phase }),
     setAltitude: (altitude) => set({ altitude }),
     setSpeed: (speed) => set({ speed }),
+    setScore: (score) => set({ score }),
 
     reset: () => set({
         phase: GamePhase.READY,
