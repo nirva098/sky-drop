@@ -5,6 +5,7 @@ import { Terrain } from '../components/Terrain';
 import { Atmosphere } from '../components/Atmosphere';
 import { GameOverScreen } from '../components/GameOverScreen';
 import { CargoPlane } from '../components/CargoPlane';
+import { SpeedParticles } from '../components/SpeedParticles';
 import { useGameStore } from '../stores/useGameStore';
 
 export const GameScene = () => {
@@ -23,6 +24,7 @@ export const GameScene = () => {
 
       <CargoPlane />
       <Atmosphere />
+      <SpeedParticles />
       <GameOverScreen />
       {/* HUD Overlay placed via Portal or just outside canvas in main App? 
           For now, we can't render HTML inside Canvas easily without <Html>. 

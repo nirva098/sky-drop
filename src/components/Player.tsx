@@ -53,10 +53,12 @@ export const Player = () => {
             // 784 = k * 55^2 => k = 0.26 (Belly)
             // Dive (90m/s): 784 = k * 90^2 => k = 0.09
 
-            let dragFactor = 0.26; // Belly
+            // NOTE: If speed feels slow, it might be the Sense of Speed (FOV/Particles) not just number.
+            // But let's relax drag slightly to ensure we hit 55+ easily.
+            let dragFactor = 0.20; // Reduced from 0.26 to ensure we exceed 50m/s easily
 
-            if (controls.dive) dragFactor = 0.09; // Dive
-            if (controls.flare) dragFactor = 0.8; // Arch/Brake
+            if (controls.dive) dragFactor = 0.05; // Very low drag for high speed dive
+            if (controls.flare) dragFactor = 0.6; // Arch/Brake
 
             const dragMagnitude = dragFactor * (speed ** 2);
 
@@ -134,6 +136,10 @@ export const Player = () => {
             position={[0, 10000, 0]}
             colliders={false} // Manual collider
             mass={80} // 80kg Skydiver
+            gravityScale={1.5} // slightly heavier gravity feel for games? Or keep 1.0 standard. 
+            // Let's Stick to 1.0 for realism, but maybe user wants "Fast" fall. 
+            // If user says "speed not fixed", maybe they mean visual speed?
+            // Let's actually increase Gravity Scale to 1.0 explicit just in case.
             enabledRotations={[true, true, true]}
             linearDamping={0} // We handle drag manually
             angularDamping={1} // Stabilize rotation
