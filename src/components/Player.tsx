@@ -4,6 +4,7 @@ import { RigidBody, RapierRigidBody, CapsuleCollider } from '@react-three/rapier
 import { useGameStore, GamePhase } from '../stores/useGameStore';
 import { useControls } from '../hooks/useControls';
 import * as THREE from 'three';
+import { SkydiverModel } from './SkydiverModel';
 
 export const Player = () => {
     const rigidBodyRef = useRef<RapierRigidBody>(null);
@@ -127,15 +128,26 @@ export const Player = () => {
             angularDamping={1} // Stabilize rotation
         >
             <CapsuleCollider args={[0.9, 0.4]} />
-            <mesh castShadow>
-                <capsuleGeometry args={[0.5, 1.8, 4, 8]} />
-                <meshStandardMaterial color={phase === GamePhase.FREEFALL ? "cyan" : phase === GamePhase.CANOPY ? "lime" : "orange"} />
-            </mesh>
-            {/* Visual Direction Indicator (Nose) */}
-            <mesh position={[0, 0.5, -0.5]}>
-                <boxGeometry args={[0.2, 0.2, 0.5]} />
-                <meshStandardMaterial color="black" />
-            </mesh>
+
+            {/* Visual Model */}
+            <group rotation={[Math.PI / 2, 0, 0]}> {/* Rotate to face down/forward by default if needed, or adjust model */}
+                <SkydiverModel />
+            </group>
+
+            {/* Parachute Visual (Simple cone for now when deployed) */}
+            {phase === GamePhase.CANOPY && (
+                <group position={[0, 4, 0]}>
+                    <mesh>
+                        <coneGeometry args={[3, 2, 8, 1, true]} />
+                        <meshStandardMaterial color="white" side={THREE.DoubleSide} />
+                    </mesh>
+                    {/* Lines */}
+                    <mesh position={[0, -1, 0]}>
+                        <cylinderGeometry args={[0.02, 0.02, 2]} />
+                        <meshBasicMaterial color="black" />
+                    </mesh>
+                </group>
+            )}
         </RigidBody>
     );
 };

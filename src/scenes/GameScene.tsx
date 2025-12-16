@@ -4,6 +4,7 @@ import { Player } from '../components/Player';
 import { Terrain } from '../components/Terrain';
 import { Atmosphere } from '../components/Atmosphere';
 import { GameOverScreen } from '../components/GameOverScreen';
+import { CargoPlane } from '../components/CargoPlane';
 import { useGameStore } from '../stores/useGameStore';
 
 export const GameScene = () => {
@@ -19,6 +20,7 @@ export const GameScene = () => {
         <Player />
       </Physics>
 
+      <CargoPlane />
       <Atmosphere />
       <GameOverScreen />
       {/* HUD Overlay placed via Portal or just outside canvas in main App? 
