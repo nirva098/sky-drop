@@ -6,7 +6,7 @@ export const CargoPlane = () => {
 
     // Hard-coded procedural plane
     return (
-        <group ref={group} position={[0, 10000, 0]} rotation={[0, Math.PI, 0]}>
+        <group ref={group} position={[0, 3048, 0]} rotation={[0, Math.PI, 0]}>
             {/* Fuselage */}
             <mesh castShadow receiveShadow>
                 <boxGeometry args={[4, 4, 20]} />

@@ -46,8 +46,8 @@ const CameraFollow = () => {
     // Simple distinct camera modes
     if (phase === 'READY') {
       // In plane view (Side scroll style or fixed)
-      state.camera.position.lerp(new THREE.Vector3(0, 10000, 20), 0.1);
-      state.camera.lookAt(0, 10000, 0);
+      state.camera.position.lerp(new THREE.Vector3(0, 3048, 20), 0.1);
+      state.camera.lookAt(0, 3048, 0);
     } else if (phase === 'FREEFALL' || phase === 'CANOPY') {
       // Follow player falling
       const playerY = altitude;

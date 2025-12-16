@@ -30,7 +30,7 @@ interface GameState {
 
 export const useGameStore = create<GameState>((set) => ({
     phase: GamePhase.READY,
-    altitude: 10000,
+    altitude: 3048, // 10,000 ft
     speed: 0,
     score: 0,
 
@@ -41,7 +41,7 @@ export const useGameStore = create<GameState>((set) => ({
 
     reset: () => set({
         phase: GamePhase.READY,
-        altitude: 10000,
+        altitude: 3048,
         speed: 0,
         score: 0
     }),

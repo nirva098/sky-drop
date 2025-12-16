@@ -18,11 +18,14 @@ export const Player = () => {
             // Initial impulse to exit plane
             rigidBodyRef.current?.applyImpulse({ x: 0, y: 0, z: -5 }, true);
         }
-        if (phase === GamePhase.FREEFALL && controls.action && altitude < 8000) {
+        if (phase === GamePhase.FREEFALL && controls.action && altitude < 900) {
             // Simple deployment altitude check to prevent instant open
             deployChute();
         }
     }, [phase, controls, jump, deployChute, altitude]);
+
+    // State for progressive deployment (0 = closed, 1 = fully open)
+    const deploymentRef = useRef(0);
 
     useFrame((_state, delta) => {
         if (!rigidBodyRef.current) return;
@@ -40,60 +43,22 @@ export const Player = () => {
 
         // 1. Ready Phase (In Plane)
         if (phase === GamePhase.READY) {
-            // Lock to plane position (simple override for now)
-            body.setTranslation({ x: 0, y: 10000, z: 0 }, true);
+            body.setTranslation({ x: 0, y: 3048, z: 0 }, true);
             body.setLinvel({ x: 0, y: 0, z: 0 }, true);
             return;
         }
 
         // 2. Freefall Physics
         if (phase === GamePhase.FREEFALL) {
-            // F_drag = k * v^2
-            // At terminal velocity (55m/s), Drag = Gravity (80kg * 9.8 = 784N)
-            // 784 = k * 55^2 => k = 0.26 (Belly)
-            // Dive (90m/s): 784 = k * 90^2 => k = 0.09
+            // Reset deployment state
+            deploymentRef.current = 0;
 
-            // NOTE: If speed feels slow, it might be the Sense of Speed (FOV/Particles) not just number.
-            // But let's relax drag slightly to ensure we hit 55+ easily.
-            let dragFactor = 0.20; // Reduced from 0.26 to ensure we exceed 50m/s easily
-
-            if (controls.dive) dragFactor = 0.05; // Very low drag for high speed dive
-            if (controls.flare) dragFactor = 0.6; // Arch/Brake
+            // Terminal V targets: Belly=55m/s (k=0.26), Dive=90m/s (k=0.09)
+            let dragFactor = 0.26;
+            if (controls.dive) dragFactor = 0.09;
+            if (controls.flare) dragFactor = 0.39; // Arch braking
 
             const dragMagnitude = dragFactor * (speed ** 2);
-
-            // F_drag vector
-            const dragForce = new THREE.Vector3(velocity.x, velocity.y, velocity.z)
-                .normalize()
-                .multiplyScalar(-dragMagnitude);
-
-            // Apply Impulse = Force * dt
-            body.applyImpulse(dragForce.multiplyScalar(delta), true);
-
-            // Steering (Torque) - Constant torque doesn't need delta if used as torque impulse per frame for "motor" effect,
-            // but for physical correctness it should be Torque * delta. 
-            // However, snappy control feel often likes raw impulse. Let's keep it direct but scaled.
-            const rotationTorque = 2; // Reduced since mass is 80, but rotation inertia might be default.
-            // Actually Rapier default inertia for Capsule(0.9, 0.4) might be low. 
-            // Let's use small values and tune.
-            if (controls.left) body.applyTorqueImpulse({ x: 0, y: rotationTorque, z: 0 }, true);
-            if (controls.right) body.applyTorqueImpulse({ x: 0, y: -rotationTorque, z: 0 }, true);
-
-            // Tracking (Forward Force)
-            if (controls.track) {
-                const trackStrength = 300; // Newtons
-                const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion(body.rotation().x, body.rotation().y, body.rotation().z, body.rotation().w));
-                body.applyImpulse(forwardDir.multiplyScalar(trackStrength * delta), true);
-            }
-        }
-
-        // 3. Canopy Physics
-        if (phase === GamePhase.CANOPY) {
-            // Descent Rate ~5m/s. Gravity = 784N.
-            // Drag = k * 5^2 = 25k. 784/25 = 31.
-            const dragFactor = 30.0;
-            const dragMagnitude = dragFactor * (speed ** 2);
-
             const dragForce = new THREE.Vector3(velocity.x, velocity.y, velocity.z)
                 .normalize()
                 .multiplyScalar(-dragMagnitude);
@@ -101,12 +66,50 @@ export const Player = () => {
             body.applyImpulse(dragForce.multiplyScalar(delta), true);
 
             // Steering
-            if (controls.left) body.applyTorqueImpulse({ x: 0, y: 0.5, z: 0 }, true);
-            if (controls.right) body.applyTorqueImpulse({ x: 0, y: -0.5, z: 0 }, true);
+            const rotationTorque = 2;
+            if (controls.left) body.applyTorqueImpulse({ x: 0, y: rotationTorque, z: 0 }, true);
+            if (controls.right) body.applyTorqueImpulse({ x: 0, y: -rotationTorque, z: 0 }, true);
+
+            // Tracking
+            if (controls.track) {
+                const trackStrength = 300;
+                const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion(body.rotation().x, body.rotation().y, body.rotation().z, body.rotation().w));
+                body.applyImpulse(forwardDir.multiplyScalar(trackStrength * delta), true);
+            }
+        }
+
+        // 3. Canopy Physics (Progressive Opening)
+        if (phase === GamePhase.CANOPY) {
+            // Smoothly ramp up drag to simulate opening shock mitigation (3 seconds to full open)
+            if (deploymentRef.current < 1) {
+                deploymentRef.current += delta / 3.0; // 3 seconds
+                if (deploymentRef.current > 1) deploymentRef.current = 1;
+            }
+
+            // Lerp dynamic drag factor
+            // Start from freefall drag (~0.26) to Canopy drag (~31.4)
+            const baseDrag = 0.26;
+            const targetDrag = 31.4;
+            // Use easeOutCubic for realistic "snatch force" curve? Or linear for simplicity.
+            // Linear lerp:
+            const currentDragFactor = baseDrag + (targetDrag - baseDrag) * deploymentRef.current;
+
+            const dragMagnitude = currentDragFactor * (speed ** 2);
+
+            const dragForce = new THREE.Vector3(velocity.x, velocity.y, velocity.z)
+                .normalize()
+                .multiplyScalar(-dragMagnitude);
+
+            body.applyImpulse(dragForce.multiplyScalar(delta), true);
+
+            // Steering (Only effective when mostly open)
+            if (deploymentRef.current > 0.5) {
+                if (controls.left) body.applyTorqueImpulse({ x: 0, y: 0.5, z: 0 }, true);
+                if (controls.right) body.applyTorqueImpulse({ x: 0, y: -0.5, z: 0 }, true);
+            }
 
             // Flare (Lift)
-            if (controls.flare) {
-                // Lift Force = 1.5g roughly? 
+            if (controls.flare && deploymentRef.current > 0.8) {
                 body.applyImpulse({ x: 0, y: 1200 * delta, z: 0 }, true);
             }
         }
@@ -124,7 +127,7 @@ export const Player = () => {
         // Reset Logic (Temporary)
         if (phase === GamePhase.LANDED && controls.action) {
             reset();
-            body.setTranslation({ x: 0, y: 10000, z: 0 }, true);
+            body.setTranslation({ x: 0, y: 3048, z: 0 }, true);
             body.setLinvel({ x: 0, y: 0, z: 0 }, true);
         }
 
@@ -133,13 +136,10 @@ export const Player = () => {
     return (
         <RigidBody
             ref={rigidBodyRef}
-            position={[0, 10000, 0]}
+            position={[0, 3048, 0]}
             colliders={false} // Manual collider
             mass={80} // 80kg Skydiver
-            gravityScale={1.5} // slightly heavier gravity feel for games? Or keep 1.0 standard. 
-            // Let's Stick to 1.0 for realism, but maybe user wants "Fast" fall. 
-            // If user says "speed not fixed", maybe they mean visual speed?
-            // Let's actually increase Gravity Scale to 1.0 explicit just in case.
+            gravityScale={1.0} // Real Earth Gravity
             enabledRotations={[true, true, true]}
             linearDamping={0} // We handle drag manually
             angularDamping={1} // Stabilize rotation
