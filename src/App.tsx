@@ -25,7 +25,7 @@ function App() {
   return (
     <>
       <HUD />
-      <Canvas shadows camera={{ position: [0, 5, 10], fov: 60 }}>
+      <Canvas shadows camera={{ position: [0, 5, 10], fov: 60, far: 20000 }}>
         <Suspense fallback={null}>
           <GameScene />
         </Suspense>

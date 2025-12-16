@@ -24,7 +24,7 @@ export const Player = () => {
         }
     }, [phase, controls, jump, deployChute, altitude]);
 
-    useFrame(() => {
+    useFrame((_state, delta) => {
         if (!rigidBodyRef.current) return;
 
         const body = rigidBodyRef.current;
@@ -48,54 +48,64 @@ export const Player = () => {
 
         // 2. Freefall Physics
         if (phase === GamePhase.FREEFALL) {
-            // Drag Calculation
-            // F = 0.5 * rho * v^2 * Cd * A
-            // Simplified: DragForce = -k * v^2
+            // F_drag = k * v^2
+            // At terminal velocity (55m/s), Drag = Gravity (80kg * 9.8 = 784N)
+            // 784 = k * 55^2 => k = 0.26 (Belly)
+            // Dive (90m/s): 784 = k * 90^2 => k = 0.09
 
-            let dragCoefficient = 0.5; // Base drag (belly)
+            let dragFactor = 0.26; // Belly
 
-            if (controls.dive) dragCoefficient = 0.2; // Head down (fast)
-            if (controls.flare) dragCoefficient = 1.0; // Arch (slow)
+            if (controls.dive) dragFactor = 0.09; // Dive
+            if (controls.flare) dragFactor = 0.8; // Arch/Brake
 
-            // Rapier applies gravity naturally. We just add Drag.
-            // Drag opposes velocity.
-            const dragMagnitude = dragCoefficient * (speed ** 2) * 0.01;
+            const dragMagnitude = dragFactor * (speed ** 2);
+
+            // F_drag vector
             const dragForce = new THREE.Vector3(velocity.x, velocity.y, velocity.z)
                 .normalize()
                 .multiplyScalar(-dragMagnitude);
 
-            body.applyImpulse(dragForce, true);
+            // Apply Impulse = Force * dt
+            body.applyImpulse(dragForce.multiplyScalar(delta), true);
 
-            // Steering (Torque/Force)
-            const rotationSpeed = 2;
-            if (controls.left) body.applyTorqueImpulse({ x: 0, y: rotationSpeed, z: 0 }, true);
-            if (controls.right) body.applyTorqueImpulse({ x: 0, y: -rotationSpeed, z: 0 }, true);
+            // Steering (Torque) - Constant torque doesn't need delta if used as torque impulse per frame for "motor" effect,
+            // but for physical correctness it should be Torque * delta. 
+            // However, snappy control feel often likes raw impulse. Let's keep it direct but scaled.
+            const rotationTorque = 2; // Reduced since mass is 80, but rotation inertia might be default.
+            // Actually Rapier default inertia for Capsule(0.9, 0.4) might be low. 
+            // Let's use small values and tune.
+            if (controls.left) body.applyTorqueImpulse({ x: 0, y: rotationTorque, z: 0 }, true);
+            if (controls.right) body.applyTorqueImpulse({ x: 0, y: -rotationTorque, z: 0 }, true);
 
-            // Tracking (Horizontal movement)
+            // Tracking (Forward Force)
             if (controls.track) {
-                const trackForce = new THREE.Vector3(0, 0, -20).applyQuaternion(new THREE.Quaternion(body.rotation().x, body.rotation().y, body.rotation().z, body.rotation().w));
-                body.applyImpulse(trackForce, true);
+                const trackStrength = 300; // Newtons
+                const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion(body.rotation().x, body.rotation().y, body.rotation().z, body.rotation().w));
+                body.applyImpulse(forwardDir.multiplyScalar(trackStrength * delta), true);
             }
         }
 
         // 3. Canopy Physics
         if (phase === GamePhase.CANOPY) {
-            // Massive Drag to slow down
-            const dragCoefficient = 2.0;
-            const dragMagnitude = dragCoefficient * (speed ** 2) * 0.05;
+            // Descent Rate ~5m/s. Gravity = 784N.
+            // Drag = k * 5^2 = 25k. 784/25 = 31.
+            const dragFactor = 30.0;
+            const dragMagnitude = dragFactor * (speed ** 2);
+
             const dragForce = new THREE.Vector3(velocity.x, velocity.y, velocity.z)
                 .normalize()
                 .multiplyScalar(-dragMagnitude);
 
-            body.applyImpulse(dragForce, true);
+            body.applyImpulse(dragForce.multiplyScalar(delta), true);
 
             // Steering
-            if (controls.left) body.applyTorqueImpulse({ x: 0, y: 1, z: 0 }, true);
-            if (controls.right) body.applyTorqueImpulse({ x: 0, y: -1, z: 0 }, true);
+            if (controls.left) body.applyTorqueImpulse({ x: 0, y: 0.5, z: 0 }, true);
+            if (controls.right) body.applyTorqueImpulse({ x: 0, y: -0.5, z: 0 }, true);
 
-            // Flare (Braking) - adds extra Lift/Drag
+            // Flare (Lift)
             if (controls.flare) {
-                body.applyImpulse({ x: 0, y: 10, z: 0 }, true); // Fake lift
+                // Lift Force = 1.5g roughly? 
+                body.applyImpulse({ x: 0, y: 1200 * delta, z: 0 }, true);
             }
         }
 
@@ -123,6 +133,7 @@ export const Player = () => {
             ref={rigidBodyRef}
             position={[0, 10000, 0]}
             colliders={false} // Manual collider
+            mass={80} // 80kg Skydiver
             enabledRotations={[true, true, true]}
             linearDamping={0} // We handle drag manually
             angularDamping={1} // Stabilize rotation

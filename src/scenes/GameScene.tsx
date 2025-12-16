@@ -10,6 +10,7 @@ import { useGameStore } from '../stores/useGameStore';
 export const GameScene = () => {
   return (
     <>
+      <color attach="background" args={['#87CEEB']} />
       <ambientLight intensity={0.4} />
       <directionalLight position={[50, 100, 25]} castShadow intensity={1.5} shadow-mapSize={[2048, 2048]} />
       <Sky sunPosition={[100, 20, 100]} turbidity={10} rayleigh={2} />
