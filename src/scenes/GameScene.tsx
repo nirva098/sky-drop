@@ -1,28 +1,24 @@
 import { Sky, Stars } from '@react-three/drei';
-import { Physics, RigidBody } from '@react-three/rapier';
+import { Physics } from '@react-three/rapier';
 import { Player } from '../components/Player';
+import { Terrain } from '../components/Terrain';
+import { Atmosphere } from '../components/Atmosphere';
 import { useGameStore } from '../stores/useGameStore';
 
 export const GameScene = () => {
   return (
     <>
-      <ambientLight intensity={0.3} />
-      <directionalLight position={[50, 50, 25]} castShadow intensity={1.5} />
-      <Sky sunPosition={[100, 20, 100]} />
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[50, 100, 25]} castShadow intensity={1.5} shadow-mapSize={[2048, 2048]} />
+      <Sky sunPosition={[100, 20, 100]} turbidity={10} rayleigh={2} />
       <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
 
       <Physics>
-        {/* Ground */}
-        <RigidBody type="fixed" colliders="cuboid" friction={2}>
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1, 0]} receiveShadow>
-            <planeGeometry args={[10000, 10000]} />
-            <meshStandardMaterial color="#2d4c1e" />
-          </mesh>
-        </RigidBody>
-
+        <Terrain />
         <Player />
       </Physics>
 
+      <Atmosphere />
       {/* HUD Overlay placed via Portal or just outside canvas in main App? 
           For now, we can't render HTML inside Canvas easily without <Html>. 
           Ideally HUD should be in App.tsx, but let's put camera controller here. 
