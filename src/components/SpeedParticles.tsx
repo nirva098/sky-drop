@@ -1,74 +1,120 @@
-import { useRef } from 'react';
+import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useGameStore } from '../stores/useGameStore';
+import { useGameStore, GamePhase } from '../stores/useGameStore';
 
+/**
+ * Speed-reactive particle system for wind/velocity visualization
+ * Particles intensity and color shift based on current speed
+ */
 export const SpeedParticles = () => {
-    const { speed } = useGameStore();
-    const count = 200;
-    const mesh = useRef<THREE.InstancedMesh>(null);
+    const { speed, phase } = useGameStore();
+    const meshRef = useRef<THREE.InstancedMesh>(null);
+    
+    // Particle configuration
+    const count = 300;
+    const dummy = useMemo(() => new THREE.Object3D(), []);
+    
+    // Particle state
+    const particleData = useRef<{
+        positions: Float32Array;
+        velocities: Float32Array;
+        sizes: Float32Array;
+    }>({
+        positions: new Float32Array(count * 3),
+        velocities: new Float32Array(count),
+        sizes: new Float32Array(count),
+    });
 
-    // Create random positions around camera
-    const dummy = new THREE.Object3D();
-    const particles = useRef(new Float32Array(count * 3));
-    const speeds = useRef(new Float32Array(count));
+    // Initialize particles
+    useMemo(() => {
+        const data = particleData.current;
+        for (let i = 0; i < count; i++) {
+            // Random positions in a box around camera
+            data.positions[i * 3] = (Math.random() - 0.5) * 30;
+            data.positions[i * 3 + 1] = (Math.random() - 0.5) * 30;
+            data.positions[i * 3 + 2] = (Math.random() - 0.5) * 30;
+            data.velocities[i] = Math.random() * 0.5 + 0.5;
+            data.sizes[i] = Math.random() * 0.5 + 0.5;
+        }
+    }, [count]);
 
     useFrame((state, delta) => {
-        if (!mesh.current) return;
-
-        // Only show if moving fast
-        if (speed < 10) {
-            mesh.current.visible = false;
-            return;
-        }
-        mesh.current.visible = true;
-
+        if (!meshRef.current) return;
+        
+        const mesh = meshRef.current;
+        const data = particleData.current;
         const cameraPos = state.camera.position;
 
-        for (let i = 0; i < count; i++) {
-            // Update Y position (fall up relative to camera, or particles move up?)
-            // Actually, we are falling down. Particles should stay still or move up relative to us.
-            // Let's just simulate "wind" moving UP past the camera (+Y).
-
-            // Initialize if needed
-            if (!particles.current[i * 3 + 1]) { // If Y is 0 (uninitialized roughly)
-                particles.current[i * 3] = (Math.random() - 0.5) * 20; // X
-                particles.current[i * 3 + 1] = (Math.random() - 0.5) * 20; // Y
-                particles.current[i * 3 + 2] = (Math.random() - 0.5) * 20; // Z
-                speeds.current[i] = Math.random() * 0.5 + 0.5;
-            }
-
-            // Move particle UP (relative to camera falling down)
-            // Speed factor based on actual player speed
-            const speedFactor = speed * 0.5 * delta * speeds.current[i];
-
-            particles.current[i * 3 + 1] += speedFactor; // Y up
-
-            // Reset if too high
-            if (particles.current[i * 3 + 1] > 10) {
-                particles.current[i * 3 + 1] = -10;
-                particles.current[i * 3] = (Math.random() - 0.5) * 20;
-                particles.current[i * 3 + 2] = (Math.random() - 0.5) * 20;
-            }
-
-            // Update Instance
-            dummy.position.set(
-                cameraPos.x + particles.current[i * 3],
-                cameraPos.y + particles.current[i * 3 + 1],
-                cameraPos.z + particles.current[i * 3 + 2]
-            );
-            // Stretch based on speed
-            dummy.scale.set(0.02, speed * 0.05, 0.02);
-            dummy.updateMatrix();
-            mesh.current.setMatrixAt(i, dummy.matrix);
+        // Only show particles during active phases with significant speed
+        const minSpeed = phase === GamePhase.CANOPY ? 3 : 15;
+        if (speed < minSpeed || phase === GamePhase.READY || phase === GamePhase.LANDED) {
+            mesh.visible = false;
+            return;
         }
-        mesh.current.instanceMatrix.needsUpdate = true;
+        mesh.visible = true;
+
+        // Speed factor affects particle behavior
+        const speedFactor = Math.min(1, speed / 80);
+        const stretchFactor = 0.05 + speedFactor * 0.3;
+
+        // Update each particle
+        for (let i = 0; i < count; i++) {
+            const idx = i * 3;
+            
+            // Move particles upward (we're falling, so wind appears to go up)
+            const particleSpeed = speed * data.velocities[i] * delta;
+            data.positions[idx + 1] += particleSpeed;
+            
+            // Add slight horizontal drift
+            data.positions[idx] += (Math.random() - 0.5) * delta * 2;
+            data.positions[idx + 2] += (Math.random() - 0.5) * delta * 2;
+
+            // Reset particles that go too far
+            if (data.positions[idx + 1] > 15) {
+                data.positions[idx] = (Math.random() - 0.5) * 30;
+                data.positions[idx + 1] = -15;
+                data.positions[idx + 2] = (Math.random() - 0.5) * 30;
+            }
+
+            // Position relative to camera
+            dummy.position.set(
+                cameraPos.x + data.positions[idx],
+                cameraPos.y + data.positions[idx + 1],
+                cameraPos.z + data.positions[idx + 2]
+            );
+
+            // Stretch based on speed (elongated in Y direction)
+            const baseSize = data.sizes[i] * 0.02;
+            dummy.scale.set(
+                baseSize,
+                baseSize + speed * stretchFactor * data.sizes[i],
+                baseSize
+            );
+
+            dummy.updateMatrix();
+            mesh.setMatrixAt(i, dummy.matrix);
+        }
+
+        mesh.instanceMatrix.needsUpdate = true;
+
+        // Update material color based on speed
+        // Shift from white to light blue at high speeds
+        const material = mesh.material as THREE.MeshBasicMaterial;
+        const blueShift = speedFactor * 0.3;
+        material.color.setRGB(1 - blueShift * 0.5, 1 - blueShift * 0.2, 1);
+        material.opacity = 0.2 + speedFactor * 0.4;
     });
 
     return (
-        <instancedMesh ref={mesh} args={[undefined, undefined, count]}>
+        <instancedMesh ref={meshRef} args={[undefined, undefined, count]} frustumCulled={false}>
             <boxGeometry args={[1, 1, 1]} />
-            <meshBasicMaterial color="white" transparent opacity={0.3} />
+            <meshBasicMaterial 
+                color="white" 
+                transparent 
+                opacity={0.3}
+                depthWrite={false}
+            />
         </instancedMesh>
     );
 };
